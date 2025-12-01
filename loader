@@ -1,0 +1,880 @@
+repeat task.wait() until game:IsLoaded()
+
+local PepeLoader = {}
+PepeLoader.__index = PepeLoader
+
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local HttpService = game:GetService("HttpService")
+local MarketplaceService = game:GetService("MarketplaceService")
+
+local LocalPlayer = Players.LocalPlayer
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+
+local KEY_PATH = "Maske_Luarmor_Key.txt"
+
+local function safeRead(path)
+    if isfile then
+        local okExists = pcall(function() return isfile(path) end)
+        if okExists and isfile(path) then
+            local okData, data = pcall(function() return readfile(path) end)
+            if okData then
+                return data
+            end
+        end
+    elseif readfile then
+        local okData, data = pcall(function() return readfile(path) end)
+        if okData then
+            return data
+        end
+    end
+    return nil
+end
+
+local function safeWrite(path, content)
+    if writefile then
+        pcall(function() writefile(path, content) end)
+    end
+end
+
+local function getGameInfo()
+    local fallbackIcon = "rbxassetid://10950477544"
+    local gameName = "Unknown Game"
+    
+    local okName, name = pcall(function()
+        return MarketplaceService:GetProductInfo(game.PlaceId).Name
+    end)
+    if okName and name then
+        gameName = name
+    end
+    
+    if not game.GameId or game.GameId == 0 then
+        return gameName, fallbackIcon
+    end
+    
+    local url = "https://thumbnails.roblox.com/v1/games/icons?universeIds="..tostring(game.GameId).."&size=512x512&format=Png&isCircular=false"
+    local okRaw, raw = pcall(function()
+        return game:HttpGet(url)
+    end)
+    if not okRaw or not raw then
+        return gameName, fallbackIcon
+    end
+    
+    local okDec, data = pcall(function()
+        return HttpService:JSONDecode(raw)
+    end)
+    if not okDec or not data or not data.data or not data.data[1] then
+        return gameName, fallbackIcon
+    end
+    
+    local img = data.data[1].imageUrl
+    if not img or img == "" then
+        return gameName, fallbackIcon
+    end
+    
+    return gameName, img
+end
+
+local function tween(o, t, props)
+    local tw = TweenService:Create(o, TweenInfo.new(t, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), props)
+    tw:Play()
+    return tw
+end
+
+function PepeLoader.new(config)
+    local self = setmetatable({}, PepeLoader)
+    
+    self.scriptId = config.ScriptId or error("ScriptId required")
+    self.games = config.Games or {}
+    self.keyPath = config.KeyPath or KEY_PATH
+    self.api = nil
+    self.busy = false
+    self.authenticated = false
+    self.keyData = {}
+    
+    local api_ok, API = pcall(function()
+        return loadstring(game:HttpGet("https://sdkAPI-public.luarmor.net/library.lua"))()
+    end)
+    
+    if api_ok then
+        API.script_id = self.scriptId
+        self.api = API
+    end
+    
+    return self
+end
+
+function PepeLoader:createUI()
+    local ScreenGui = Instance.new("ScreenGui")
+    ScreenGui.IgnoreGuiInset = true
+    ScreenGui.ResetOnSpawn = false
+    ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    ScreenGui.Name = "PepeLoader"
+    ScreenGui.Parent = PlayerGui
+    
+    local BlurFrame = Instance.new("Frame")
+    BlurFrame.Size = UDim2.new(1, 0, 1, 0)
+    BlurFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    BlurFrame.BackgroundTransparency = 1
+    BlurFrame.BorderSizePixel = 0
+    BlurFrame.ZIndex = 1
+    BlurFrame.Parent = ScreenGui
+    
+    local Root = Instance.new("Frame")
+    Root.AnchorPoint = Vector2.new(0.5, 0.5)
+    Root.Position = UDim2.new(0.5, 0, 0.5, 0)
+    Root.Size = UDim2.new(0, 400, 0, 300)
+    Root.BackgroundColor3 = Color3.fromRGB(22, 22, 26)
+    Root.BackgroundTransparency = 1
+    Root.BorderSizePixel = 0
+    Root.ZIndex = 2
+    Root.Parent = ScreenGui
+    
+    local RootCorner = Instance.new("UICorner", Root)
+    RootCorner.CornerRadius = UDim.new(0, 4)
+    
+    local RootStroke = Instance.new("UIStroke", Root)
+    RootStroke.Thickness = 1.5
+    RootStroke.Color = Color3.fromRGB(140, 140, 150)
+    RootStroke.Transparency = 0.6
+    
+    local Shadow = Instance.new("ImageLabel")
+    Shadow.BackgroundTransparency = 1
+    Shadow.Image = "rbxassetid://5028857084"
+    Shadow.ImageColor3 = Color3.fromRGB(0, 0, 0)
+    Shadow.ImageTransparency = 0.3
+    Shadow.ScaleType = Enum.ScaleType.Slice
+    Shadow.SliceCenter = Rect.new(24, 24, 276, 276)
+    Shadow.Size = UDim2.new(1, 50, 1, 50)
+    Shadow.Position = UDim2.new(0, -25, 0, -25)
+    Shadow.ZIndex = 0
+    Shadow.Parent = Root
+    
+    local TopBar = Instance.new("Frame")
+    TopBar.Size = UDim2.new(1, 0, 0, 45)
+    TopBar.BackgroundColor3 = Color3.fromRGB(18, 18, 22)
+    TopBar.BorderSizePixel = 0
+    TopBar.ZIndex = 3
+    TopBar.Parent = Root
+    
+    local TopBarCorner = Instance.new("UICorner", TopBar)
+    TopBarCorner.CornerRadius = UDim.new(0, 4)
+    
+    local TopBarMask = Instance.new("Frame")
+    TopBarMask.Size = UDim2.new(1, 0, 0, 4)
+    TopBarMask.Position = UDim2.new(0, 0, 1, -4)
+    TopBarMask.BackgroundColor3 = Color3.fromRGB(18, 18, 22)
+    TopBarMask.BorderSizePixel = 0
+    TopBarMask.ZIndex = 3
+    TopBarMask.Parent = TopBar
+    
+    local TopBarDivider = Instance.new("Frame")
+    TopBarDivider.Size = UDim2.new(1, 0, 0, 1)
+    TopBarDivider.Position = UDim2.new(0, 0, 1, 0)
+    TopBarDivider.BackgroundColor3 = Color3.fromRGB(140, 140, 150)
+    TopBarDivider.BackgroundTransparency = 0.7
+    TopBarDivider.BorderSizePixel = 0
+    TopBarDivider.ZIndex = 3
+    TopBarDivider.Parent = TopBar
+    
+    local Title = Instance.new("TextLabel")
+    Title.Size = UDim2.new(0, 250, 1, 0)
+    Title.Position = UDim2.new(0, 18, 0, 0)
+    Title.BackgroundTransparency = 1
+    Title.Font = Enum.Font.RobotoMono
+    Title.Text = "PEPE LOADER"
+    Title.TextColor3 = Color3.fromRGB(220, 220, 230)
+    Title.TextSize = 15
+    Title.TextXAlignment = Enum.TextXAlignment.Left
+    Title.TextTransparency = 1
+    Title.ZIndex = 4
+    Title.Parent = TopBar
+    
+    local CloseBtn = Instance.new("TextButton")
+    CloseBtn.Size = UDim2.new(0, 35, 0, 35)
+    CloseBtn.Position = UDim2.new(1, -40, 0, 5)
+    CloseBtn.BackgroundColor3 = Color3.fromRGB(28, 28, 32)
+    CloseBtn.BorderSizePixel = 0
+    CloseBtn.AutoButtonColor = false
+    CloseBtn.Font = Enum.Font.RobotoMono
+    CloseBtn.Text = "X"
+    CloseBtn.TextSize = 14
+    CloseBtn.TextColor3 = Color3.fromRGB(200, 200, 210)
+    CloseBtn.ZIndex = 4
+    CloseBtn.Parent = TopBar
+    
+    local CloseBtnCorner = Instance.new("UICorner", CloseBtn)
+    CloseBtnCorner.CornerRadius = UDim.new(0, 3)
+    
+    local CloseBtnStroke = Instance.new("UIStroke", CloseBtn)
+    CloseBtnStroke.Thickness = 1
+    CloseBtnStroke.Color = Color3.fromRGB(100, 100, 110)
+    CloseBtnStroke.Transparency = 0.6
+    
+    local Content = Instance.new("Frame")
+    Content.Size = UDim2.new(1, -30, 1, -60)
+    Content.Position = UDim2.new(0, 15, 0, 52)
+    Content.BackgroundTransparency = 1
+    Content.ZIndex = 3
+    Content.Parent = Root
+    
+    local GameInfoContainer = Instance.new("Frame")
+    GameInfoContainer.Size = UDim2.new(1, 0, 0, 75)
+    GameInfoContainer.BackgroundColor3 = Color3.fromRGB(28, 28, 32)
+    GameInfoContainer.BorderSizePixel = 0
+    GameInfoContainer.ZIndex = 3
+    GameInfoContainer.Parent = Content
+    
+    local GameInfoCorner = Instance.new("UICorner", GameInfoContainer)
+    GameInfoCorner.CornerRadius = UDim.new(0, 4)
+    
+    local GameInfoStroke = Instance.new("UIStroke", GameInfoContainer)
+    GameInfoStroke.Thickness = 1
+    GameInfoStroke.Color = Color3.fromRGB(100, 100, 110)
+    GameInfoStroke.Transparency = 0.6
+    
+    local GameIcon = Instance.new("ImageLabel")
+    GameIcon.Size = UDim2.new(0, 65, 0, 65)
+    GameIcon.Position = UDim2.new(0, 5, 0, 5)
+    GameIcon.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
+    GameIcon.BorderSizePixel = 0
+    GameIcon.ScaleType = Enum.ScaleType.Fit
+    GameIcon.ZIndex = 4
+    GameIcon.Parent = GameInfoContainer
+    
+    local GameIconCorner = Instance.new("UICorner", GameIcon)
+    GameIconCorner.CornerRadius = UDim.new(0, 3)
+    
+    local GameIconStroke = Instance.new("UIStroke", GameIcon)
+    GameIconStroke.Thickness = 1
+    GameIconStroke.Color = Color3.fromRGB(80, 80, 90)
+    GameIconStroke.Transparency = 0.7
+    
+    local GameDetails = Instance.new("Frame")
+    GameDetails.Size = UDim2.new(1, -85, 1, -10)
+    GameDetails.Position = UDim2.new(0, 80, 0, 5)
+    GameDetails.BackgroundTransparency = 1
+    GameDetails.ZIndex = 4
+    GameDetails.Parent = GameInfoContainer
+    
+    local GameNameLabel = Instance.new("TextLabel")
+    GameNameLabel.Size = UDim2.new(1, 0, 0, 20)
+    GameNameLabel.BackgroundTransparency = 1
+    GameNameLabel.Font = Enum.Font.RobotoMono
+    GameNameLabel.Text = "Loading..."
+    GameNameLabel.TextColor3 = Color3.fromRGB(230, 230, 240)
+    GameNameLabel.TextSize = 14
+    GameNameLabel.TextXAlignment = Enum.TextXAlignment.Left
+    GameNameLabel.TextTruncate = Enum.TextTruncate.AtEnd
+    GameNameLabel.ZIndex = 4
+    GameNameLabel.Parent = GameDetails
+    
+    local GameIdLabel = Instance.new("TextLabel")
+    GameIdLabel.Size = UDim2.new(1, 0, 0, 16)
+    GameIdLabel.Position = UDim2.new(0, 0, 0, 22)
+    GameIdLabel.BackgroundTransparency = 1
+    GameIdLabel.Font = Enum.Font.RobotoMono
+    GameIdLabel.Text = "Place ID: "..tostring(game.PlaceId)
+    GameIdLabel.TextColor3 = Color3.fromRGB(150, 150, 160)
+    GameIdLabel.TextSize = 11
+    GameIdLabel.TextXAlignment = Enum.TextXAlignment.Left
+    GameIdLabel.ZIndex = 4
+    GameIdLabel.Parent = GameDetails
+    
+    local ExecutorLabel = Instance.new("TextLabel")
+    ExecutorLabel.Size = UDim2.new(1, 0, 0, 16)
+    ExecutorLabel.Position = UDim2.new(0, 0, 0, 40)
+    ExecutorLabel.BackgroundTransparency = 1
+    ExecutorLabel.Font = Enum.Font.RobotoMono
+    ExecutorLabel.Text = "Executor: "..(identifyexecutor and identifyexecutor() or "Unknown")
+    ExecutorLabel.TextColor3 = Color3.fromRGB(150, 150, 160)
+    ExecutorLabel.TextSize = 11
+    ExecutorLabel.TextXAlignment = Enum.TextXAlignment.Left
+    ExecutorLabel.ZIndex = 4
+    ExecutorLabel.Parent = GameDetails
+    
+    local KeyInfoContainer = Instance.new("Frame")
+    KeyInfoContainer.Size = UDim2.new(1, 0, 0, 70)
+    KeyInfoContainer.Position = UDim2.new(0, 0, 0, 85)
+    KeyInfoContainer.BackgroundColor3 = Color3.fromRGB(28, 28, 32)
+    KeyInfoContainer.BorderSizePixel = 0
+    KeyInfoContainer.Visible = false
+    KeyInfoContainer.ZIndex = 3
+    KeyInfoContainer.Parent = Content
+    
+    local KeyInfoCorner = Instance.new("UICorner", KeyInfoContainer)
+    KeyInfoCorner.CornerRadius = UDim.new(0, 4)
+    
+    local KeyInfoStroke = Instance.new("UIStroke", KeyInfoContainer)
+    KeyInfoStroke.Thickness = 1
+    KeyInfoStroke.Color = Color3.fromRGB(100, 100, 110)
+    KeyInfoStroke.Transparency = 0.6
+    
+    local KeyInfoContent = Instance.new("Frame")
+    KeyInfoContent.Size = UDim2.new(1, -20, 1, -10)
+    KeyInfoContent.Position = UDim2.new(0, 10, 0, 5)
+    KeyInfoContent.BackgroundTransparency = 1
+    KeyInfoContent.ZIndex = 4
+    KeyInfoContent.Parent = KeyInfoContainer
+    
+    local ExpiryLabel = Instance.new("TextLabel")
+    ExpiryLabel.Size = UDim2.new(1, 0, 0, 16)
+    ExpiryLabel.Position = UDim2.new(0, 0, 0, 2)
+    ExpiryLabel.BackgroundTransparency = 1
+    ExpiryLabel.Font = Enum.Font.RobotoMono
+    ExpiryLabel.Text = "Expires: Loading..."
+    ExpiryLabel.TextColor3 = Color3.fromRGB(180, 180, 190)
+    ExpiryLabel.TextSize = 11
+    ExpiryLabel.TextXAlignment = Enum.TextXAlignment.Left
+    ExpiryLabel.ZIndex = 4
+    ExpiryLabel.Parent = KeyInfoContent
+    
+    local DiscordContainer = Instance.new("TextButton")
+    DiscordContainer.Size = UDim2.new(1, 0, 0, 16)
+    DiscordContainer.Position = UDim2.new(0, 0, 0, 20)
+    DiscordContainer.BackgroundTransparency = 1
+    DiscordContainer.AutoButtonColor = false
+    DiscordContainer.Text = ""
+    DiscordContainer.ZIndex = 5
+    DiscordContainer.Parent = KeyInfoContent
+    
+    local DiscordBlurred = Instance.new("TextLabel")
+    DiscordBlurred.Size = UDim2.new(1, 0, 1, 0)
+    DiscordBlurred.BackgroundTransparency = 1
+    DiscordBlurred.Font = Enum.Font.RobotoMono
+    DiscordBlurred.Text = "Discord: ••••••••••••"
+    DiscordBlurred.TextColor3 = Color3.fromRGB(180, 180, 190)
+    DiscordBlurred.TextSize = 11
+    DiscordBlurred.TextXAlignment = Enum.TextXAlignment.Left
+    DiscordBlurred.ZIndex = 6
+    DiscordBlurred.Parent = DiscordContainer
+    
+    local DiscordActual = Instance.new("TextLabel")
+    DiscordActual.Size = UDim2.new(1, 0, 1, 0)
+    DiscordActual.BackgroundTransparency = 1
+    DiscordActual.Font = Enum.Font.RobotoMono
+    DiscordActual.Text = "Discord: Loading..."
+    DiscordActual.TextColor3 = Color3.fromRGB(180, 180, 190)
+    DiscordActual.TextSize = 11
+    DiscordActual.TextXAlignment = Enum.TextXAlignment.Left
+    DiscordActual.TextTransparency = 1
+    DiscordActual.ZIndex = 5
+    DiscordActual.Parent = DiscordContainer
+    
+    local KeyStatusLabel = Instance.new("TextLabel")
+    KeyStatusLabel.Size = UDim2.new(1, 0, 0, 16)
+    KeyStatusLabel.Position = UDim2.new(0, 0, 0, 38)
+    KeyStatusLabel.BackgroundTransparency = 1
+    KeyStatusLabel.Font = Enum.Font.RobotoMono
+    KeyStatusLabel.Text = "STATUS: AUTHENTICATED"
+    KeyStatusLabel.TextColor3 = Color3.fromRGB(150, 220, 160)
+    KeyStatusLabel.TextSize = 11
+    KeyStatusLabel.TextXAlignment = Enum.TextXAlignment.Left
+    KeyStatusLabel.ZIndex = 4
+    KeyStatusLabel.Parent = KeyInfoContent
+    
+    local StatusLabel = Instance.new("TextLabel")
+    StatusLabel.Size = UDim2.new(1, 0, 0, 18)
+    StatusLabel.Position = UDim2.new(0, 0, 0, 165)
+    StatusLabel.BackgroundTransparency = 1
+    StatusLabel.Font = Enum.Font.RobotoMono
+    StatusLabel.Text = "Initializing..."
+    StatusLabel.TextColor3 = Color3.fromRGB(190, 190, 200)
+    StatusLabel.TextSize = 12
+    StatusLabel.TextXAlignment = Enum.TextXAlignment.Left
+    StatusLabel.TextTransparency = 1
+    StatusLabel.ZIndex = 3
+    StatusLabel.Parent = Content
+    
+    local InputBox = Instance.new("Frame")
+    InputBox.Size = UDim2.new(1, 0, 0, 38)
+    InputBox.Position = UDim2.new(0, 0, 0, 190)
+    InputBox.BackgroundColor3 = Color3.fromRGB(28, 28, 32)
+    InputBox.BorderSizePixel = 0
+    InputBox.Visible = false
+    InputBox.ZIndex = 3
+    InputBox.Parent = Content
+    
+    local InputBoxCorner = Instance.new("UICorner", InputBox)
+    InputBoxCorner.CornerRadius = UDim.new(0, 4)
+    
+    local InputBoxStroke = Instance.new("UIStroke", InputBox)
+    InputBoxStroke.Thickness = 1
+    InputBoxStroke.Color = Color3.fromRGB(100, 100, 110)
+    InputBoxStroke.Transparency = 0.6
+    
+    local KeyInput = Instance.new("TextBox")
+    KeyInput.Size = UDim2.new(1, -20, 1, -10)
+    KeyInput.Position = UDim2.new(0, 10, 0, 5)
+    KeyInput.BackgroundTransparency = 1
+    KeyInput.ClearTextOnFocus = false
+    KeyInput.Text = ""
+    KeyInput.PlaceholderText = "Enter Luarmor Key"
+    KeyInput.Font = Enum.Font.RobotoMono
+    KeyInput.TextSize = 12
+    KeyInput.TextColor3 = Color3.fromRGB(230, 230, 240)
+    KeyInput.PlaceholderColor3 = Color3.fromRGB(120, 120, 130)
+    KeyInput.TextXAlignment = Enum.TextXAlignment.Left
+    KeyInput.ZIndex = 4
+    KeyInput.Parent = InputBox
+    
+    local ButtonsContainer = Instance.new("Frame")
+    ButtonsContainer.Size = UDim2.new(1, 0, 0, 36)
+    ButtonsContainer.Position = UDim2.new(0, 0, 1, -36)
+    ButtonsContainer.BackgroundTransparency = 1
+    ButtonsContainer.Visible = false
+    ButtonsContainer.ZIndex = 3
+    ButtonsContainer.Parent = Content
+    
+    local LoginButton = Instance.new("TextButton")
+    LoginButton.Size = UDim2.new(0.48, 0, 1, 0)
+    LoginButton.BackgroundColor3 = Color3.fromRGB(160, 160, 170)
+    LoginButton.BorderSizePixel = 0
+    LoginButton.AutoButtonColor = false
+    LoginButton.Font = Enum.Font.RobotoMono
+    LoginButton.Text = "LOGIN"
+    LoginButton.TextSize = 13
+    LoginButton.TextColor3 = Color3.fromRGB(20, 20, 24)
+    LoginButton.ZIndex = 4
+    LoginButton.Parent = ButtonsContainer
+    
+    local LoginButtonCorner = Instance.new("UICorner", LoginButton)
+    LoginButtonCorner.CornerRadius = UDim.new(0, 3)
+    
+    local LoginButtonStroke = Instance.new("UIStroke", LoginButton)
+    LoginButtonStroke.Thickness = 1
+    LoginButtonStroke.Color = Color3.fromRGB(180, 180, 190)
+    LoginButtonStroke.Transparency = 0.4
+    
+    local CloseButton = Instance.new("TextButton")
+    CloseButton.Size = UDim2.new(0.48, 0, 1, 0)
+    CloseButton.Position = UDim2.new(0.52, 0, 0, 0)
+    CloseButton.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
+    CloseButton.BorderSizePixel = 0
+    CloseButton.AutoButtonColor = false
+    CloseButton.Font = Enum.Font.RobotoMono
+    CloseButton.Text = "CLOSE"
+    CloseButton.TextSize = 13
+    CloseButton.TextColor3 = Color3.fromRGB(200, 200, 210)
+    CloseButton.ZIndex = 4
+    CloseButton.Parent = ButtonsContainer
+    
+    local CloseButtonCorner = Instance.new("UICorner", CloseButton)
+    CloseButtonCorner.CornerRadius = UDim.new(0, 3)
+    
+    local CloseButtonStroke = Instance.new("UIStroke", CloseButton)
+    CloseButtonStroke.Thickness = 1
+    CloseButtonStroke.Color = Color3.fromRGB(100, 100, 110)
+    CloseButtonStroke.Transparency = 0.6
+    
+    local GameSelectContainer = Instance.new("ScrollingFrame")
+    GameSelectContainer.Size = UDim2.new(1, 0, 0, 90)
+    GameSelectContainer.Position = UDim2.new(0, 0, 0, 165)
+    GameSelectContainer.BackgroundColor3 = Color3.fromRGB(28, 28, 32)
+    GameSelectContainer.BorderSizePixel = 0
+    GameSelectContainer.ScrollBarThickness = 4
+    GameSelectContainer.ScrollBarImageColor3 = Color3.fromRGB(100, 100, 110)
+    GameSelectContainer.Visible = false
+    GameSelectContainer.ZIndex = 3
+    GameSelectContainer.Parent = Content
+    
+    local GameSelectCorner = Instance.new("UICorner", GameSelectContainer)
+    GameSelectCorner.CornerRadius = UDim.new(0, 4)
+    
+    local GameSelectStroke = Instance.new("UIStroke", GameSelectContainer)
+    GameSelectStroke.Thickness = 1
+    GameSelectStroke.Color = Color3.fromRGB(100, 100, 110)
+    GameSelectStroke.Transparency = 0.6
+    
+    local GameListLayout = Instance.new("UIListLayout", GameSelectContainer)
+    GameListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    GameListLayout.Padding = UDim.new(0, 5)
+    
+    local GameListPadding = Instance.new("UIPadding", GameSelectContainer)
+    GameListPadding.PaddingTop = UDim.new(0, 5)
+    GameListPadding.PaddingBottom = UDim.new(0, 5)
+    GameListPadding.PaddingLeft = UDim.new(0, 5)
+    GameListPadding.PaddingRight = UDim.new(0, 5)
+    
+    self.ui = {
+        ScreenGui = ScreenGui,
+        BlurFrame = BlurFrame,
+        Root = Root,
+        Title = Title,
+        CloseBtn = CloseBtn,
+        GameIcon = GameIcon,
+        GameNameLabel = GameNameLabel,
+        GameIdLabel = GameIdLabel,
+        ExecutorLabel = ExecutorLabel,
+        KeyInfoContainer = KeyInfoContainer,
+        ExpiryLabel = ExpiryLabel,
+        DiscordContainer = DiscordContainer,
+        DiscordBlurred = DiscordBlurred,
+        DiscordActual = DiscordActual,
+        KeyStatusLabel = KeyStatusLabel,
+        StatusLabel = StatusLabel,
+        InputBox = InputBox,
+        KeyInput = KeyInput,
+        InputBoxStroke = InputBoxStroke,
+        ButtonsContainer = ButtonsContainer,
+        LoginButton = LoginButton,
+        CloseButton = CloseButton,
+        GameSelectContainer = GameSelectContainer,
+        GameListLayout = GameListLayout
+    }
+    
+    self:setupEvents()
+    self:playOpenAnimation()
+    
+    return self.ui
+end
+
+function PepeLoader:setupEvents()
+    local ui = self.ui
+    
+    ui.LoginButton.MouseEnter:Connect(function()
+        TweenService:Create(ui.LoginButton, TweenInfo.new(0.15), {
+            BackgroundColor3 = Color3.fromRGB(180, 180, 190)
+        }):Play()
+    end)
+    
+    ui.LoginButton.MouseLeave:Connect(function()
+        TweenService:Create(ui.LoginButton, TweenInfo.new(0.15), {
+            BackgroundColor3 = Color3.fromRGB(160, 160, 170)
+        }):Play()
+    end)
+    
+    ui.CloseButton.MouseEnter:Connect(function()
+        TweenService:Create(ui.CloseButton, TweenInfo.new(0.15), {
+            BackgroundColor3 = Color3.fromRGB(45, 45, 50)
+        }):Play()
+    end)
+    
+    ui.CloseButton.MouseLeave:Connect(function()
+        TweenService:Create(ui.CloseButton, TweenInfo.new(0.15), {
+            BackgroundColor3 = Color3.fromRGB(35, 35, 40)
+        }):Play()
+    end)
+    
+    ui.CloseBtn.MouseEnter:Connect(function()
+        TweenService:Create(ui.CloseBtn, TweenInfo.new(0.15), {
+            BackgroundColor3 = Color3.fromRGB(38, 38, 42)
+        }):Play()
+    end)
+    
+    ui.CloseBtn.MouseLeave:Connect(function()
+        TweenService:Create(ui.CloseBtn, TweenInfo.new(0.15), {
+            BackgroundColor3 = Color3.fromRGB(28, 28, 32)
+        }):Play()
+    end)
+    
+    ui.KeyInput.Focused:Connect(function()
+        TweenService:Create(ui.InputBoxStroke, TweenInfo.new(0.15), {
+            Color = Color3.fromRGB(160, 160, 170),
+            Transparency = 0.3
+        }):Play()
+    end)
+    
+    ui.KeyInput.FocusLost:Connect(function()
+        TweenService:Create(ui.InputBoxStroke, TweenInfo.new(0.15), {
+            Color = Color3.fromRGB(100, 100, 110),
+            Transparency = 0.6
+        }):Play()
+    end)
+    
+    ui.DiscordContainer.MouseEnter:Connect(function()
+        TweenService:Create(ui.DiscordBlurred, TweenInfo.new(0.2), {TextTransparency = 1}):Play()
+        TweenService:Create(ui.DiscordActual, TweenInfo.new(0.2), {TextTransparency = 0}):Play()
+    end)
+    
+    ui.DiscordContainer.MouseLeave:Connect(function()
+        TweenService:Create(ui.DiscordBlurred, TweenInfo.new(0.2), {TextTransparency = 0}):Play()
+        TweenService:Create(ui.DiscordActual, TweenInfo.new(0.2), {TextTransparency = 1}):Play()
+    end)
+    
+    ui.LoginButton.MouseButton1Click:Connect(function()
+        if not self.busy then
+            self:authenticate(ui.KeyInput.Text)
+        end
+    end)
+    
+    ui.CloseButton.MouseButton1Click:Connect(function()
+        self:close()
+    end)
+    
+    ui.CloseBtn.MouseButton1Click:Connect(function()
+        self:close()
+    end)
+end
+
+function PepeLoader:playOpenAnimation()
+    local ui = self.ui
+    
+    ui.Root.Size = UDim2.new(0, 380, 0, 280)
+    ui.Root.BackgroundTransparency = 1
+    ui.BlurFrame.BackgroundTransparency = 1
+    
+    local tw1 = tween(ui.BlurFrame, 0.4, {BackgroundTransparency = 0.4})
+    local tw2 = tween(ui.Root, 0.45, {
+        BackgroundTransparency = 0,
+        Size = UDim2.new(0, 450, 0, 340)
+    })
+    
+    task.wait(0.25)
+    tween(ui.Title, 0.3, {TextTransparency = 0})
+    tween(ui.StatusLabel, 0.3, {TextTransparency = 0})
+end
+
+function PepeLoader:close()
+    local ui = self.ui
+    
+    tween(ui.Title, 0.2, {TextTransparency = 1})
+    tween(ui.StatusLabel, 0.2, {TextTransparency = 1})
+    tween(ui.Root, 0.35, {
+        BackgroundTransparency = 1,
+        Size = UDim2.new(0, 380, 0, 280)
+    })
+    tween(ui.BlurFrame, 0.35, {BackgroundTransparency = 1})
+    
+    task.wait(0.4)
+    ui.ScreenGui:Destroy()
+end
+
+function PepeLoader:setStatus(text, color)
+    local ui = self.ui
+    
+    tween(ui.StatusLabel, 0.15, {TextTransparency = 1})
+    task.wait(0.15)
+    
+    ui.StatusLabel.Text = text
+    ui.StatusLabel.TextColor3 = color or Color3.fromRGB(190, 190, 200)
+    
+    tween(ui.StatusLabel, 0.2, {TextTransparency = 0})
+end
+
+function PepeLoader:authenticate(key)
+    if not self.api then
+        self:setStatus("Luarmor API error", Color3.fromRGB(240, 120, 120))
+        return false
+    end
+    
+    if self.busy then
+        return false
+    end
+    
+    self.busy = true
+    
+    if not key or key == "" then
+        self.busy = false
+        self:setStatus("Key required", Color3.fromRGB(240, 140, 120))
+        return false
+    end
+    
+    _G.script_key = key
+    script_key = key
+    
+    self:setStatus("Authenticating...", Color3.fromRGB(140, 180, 240))
+    
+    local okStatus, status = pcall(function()
+        return self.api.check_key(key)
+    end)
+    
+    if not okStatus or not status or not status.code then
+        self.busy = false
+        self:setStatus("Auth failed", Color3.fromRGB(240, 120, 120))
+        return false
+    end
+    
+    if status.code == "KEY_VALID" then
+        safeWrite(self.keyPath, key)
+        self.authenticated = true
+        self.keyData = status
+        
+        local expiryText = "Never"
+        if status.expiry and status.expiry ~= "lifetime" and status.expiry ~= "never" then
+            expiryText = status.expiry
+        end
+        self.ui.ExpiryLabel.Text = "Expires: "..expiryText
+        
+        if status.discord then
+            self.ui.DiscordActual.Text = "Discord: "..status.discord
+        else
+            self.ui.DiscordActual.Text = "Discord: N/A"
+        end
+        
+        self:showAuthenticatedState()
+        self.busy = false
+        return true
+    end
+    
+    local codesMap = {
+        KEY_EXPIRED = "Key expired",
+        KEY_BANNED = "Key blacklisted",
+        KEY_HWID_LOCKED = "HWID locked",
+        KEY_INCORRECT = "Invalid key",
+        KEY_INVALID = "Invalid format",
+        SCRIPT_ID_INCORRECT = "Script ID error",
+        SCRIPT_ID_INVALID = "Invalid script ID",
+        INVALID_EXECUTOR = "Unsupported executor",
+        SECURITY_ERROR = "Security error",
+        TIME_ERROR = "Request timeout",
+        UNKNOWN_ERROR = "Unknown error"
+    }
+    
+    local msg = codesMap[status.code] or status.message or status.code
+    self:setStatus(msg, Color3.fromRGB(240, 140, 120))
+    self.busy = false
+    return false
+end
+
+function PepeLoader:showAuthenticatedState()
+    local ui = self.ui
+    
+    ui.InputBox.Visible = false
+    ui.ButtonsContainer.Visible = false
+    
+    ui.KeyInfoContainer.Visible = true
+    ui.KeyInfoContainer.BackgroundTransparency = 1
+    tween(ui.KeyInfoContainer, 0.3, {BackgroundTransparency = 0})
+    
+    task.wait(0.3)
+    
+    if #self.games > 0 then
+        self:setStatus("Select game to load", Color3.fromRGB(150, 220, 160))
+        self:showGameSelection()
+    else
+        ui.LoginButton.Text = "LOAD"
+        ui.LoginButton.Parent = ui.ButtonsContainer
+        ui.CloseButton.Parent = ui.ButtonsContainer
+        ui.ButtonsContainer.Visible = true
+        ui.ButtonsContainer.Position = UDim2.new(0, 0, 1, -36)
+        
+        ui.LoginButton.BackgroundTransparency = 1
+        ui.CloseButton.BackgroundTransparency = 1
+        ui.LoginButton.TextTransparency = 1
+        ui.CloseButton.TextTransparency = 1
+        
+        tween(ui.LoginButton, 0.25, {BackgroundTransparency = 0, TextTransparency = 0})
+        tween(ui.CloseButton, 0.25, {BackgroundTransparency = 0, TextTransparency = 0})
+        
+        ui.LoginButton.MouseButton1Click:Connect(function()
+            if self.authenticated and not self.busy then
+                self:loadScript()
+            end
+        end)
+        
+        self:setStatus("Ready to load", Color3.fromRGB(150, 220, 160))
+    end
+end
+
+function PepeLoader:showGameSelection()
+    local ui = self.ui
+    
+    ui.GameSelectContainer.Visible = true
+    ui.GameSelectContainer.BackgroundTransparency = 1
+    tween(ui.GameSelectContainer, 0.3, {BackgroundTransparency = 0})
+    
+    for _, game in ipairs(self.games) do
+        local gameBtn = Instance.new("TextButton")
+        gameBtn.Size = UDim2.new(1, -10, 0, 30)
+        gameBtn.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
+        gameBtn.BorderSizePixel = 0
+        gameBtn.AutoButtonColor = false
+        gameBtn.Font = Enum.Font.RobotoMono
+        gameBtn.Text = game.Name
+        gameBtn.TextSize = 12
+        gameBtn.TextColor3 = Color3.fromRGB(220, 220, 230)
+        gameBtn.ZIndex = 4
+        gameBtn.Parent = ui.GameSelectContainer
+        
+        local btnCorner = Instance.new("UICorner", gameBtn)
+        btnCorner.CornerRadius = UDim.new(0, 3)
+        
+        local btnStroke = Instance.new("UIStroke", gameBtn)
+        btnStroke.Thickness = 1
+        btnStroke.Color = Color3.fromRGB(100, 100, 110)
+        btnStroke.Transparency = 0.6
+        
+        gameBtn.MouseEnter:Connect(function()
+            TweenService:Create(gameBtn, TweenInfo.new(0.15), {
+                BackgroundColor3 = Color3.fromRGB(45, 45, 50)
+            }):Play()
+        end)
+        
+        gameBtn.MouseLeave:Connect(function()
+            TweenService:Create(gameBtn, TweenInfo.new(0.15), {
+                BackgroundColor3 = Color3.fromRGB(35, 35, 40)
+            }):Play()
+        end)
+        
+        gameBtn.MouseButton1Click:Connect(function()
+            if self.authenticated and not self.busy then
+                self:loadScript(game.LoadFunction)
+            end
+        end)
+    end
+    
+    ui.GameSelectContainer.CanvasSize = UDim2.new(0, 0, 0, ui.GameListLayout.AbsoluteContentSize.Y + 10)
+end
+
+function PepeLoader:loadScript(customLoader)
+    if not self.authenticated then
+        return
+    end
+    
+    self.busy = true
+    self:setStatus("Loading script...", Color3.fromRGB(150, 220, 160))
+    
+    task.delay(0.2, function()
+        pcall(function()
+            if customLoader then
+                customLoader()
+            else
+                self.api.load_script()
+            end
+        end)
+    end)
+    
+    task.wait(0.5)
+    self:close()
+end
+
+function PepeLoader:start()
+    self:createUI()
+    
+    local gameName, gameIcon = getGameInfo()
+    self.ui.GameIcon.Image = gameIcon
+    self.ui.GameNameLabel.Text = gameName
+    
+    self:setStatus("Checking saved key...", Color3.fromRGB(140, 180, 240))
+    task.wait(0.5)
+    
+    local savedKey = safeRead(self.keyPath)
+    
+    if savedKey and savedKey ~= "" then
+        local success = self:authenticate(savedKey)
+        if success then
+            return
+        end
+    end
+    
+    self.ui.InputBox.Visible = true
+    self.ui.ButtonsContainer.Visible = true
+    self.ui.InputBox.BackgroundTransparency = 1
+    self.ui.LoginButton.BackgroundTransparency = 1
+    self.ui.CloseButton.BackgroundTransparency = 1
+    self.ui.LoginButton.TextTransparency = 1
+    self.ui.CloseButton.TextTransparency = 1
+    
+    tween(self.ui.InputBox, 0.25, {BackgroundTransparency = 0})
+    tween(self.ui.LoginButton, 0.25, {BackgroundTransparency = 0, TextTransparency = 0})
+    tween(self.ui.CloseButton, 0.25, {BackgroundTransparency = 0, TextTransparency = 0})
+    
+    if savedKey and savedKey ~= "" then
+        self.ui.KeyInput.Text = savedKey
+    end
+    
+    self:setStatus("Enter key to continue", Color3.fromRGB(200, 200, 210))
+end
+
+return PepeLoader
