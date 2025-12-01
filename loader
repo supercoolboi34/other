@@ -652,6 +652,56 @@ function PepeLoader:setStatus(text, color)
     tween(ui.StatusLabel, 0.2, {TextTransparency = 0})
 end
 
+function PepeLoader:getKeyDetails(apiKey)
+    local url = "https://api.luarmor.net/v3/keys/"..apiKey.."/details"
+    
+    local okReq, response = pcall(function()
+        return game:HttpGet(url)
+    end)
+    
+    if not okReq or not response then
+        return nil
+    end
+    
+    local okDec, data = pcall(function()
+        return HttpService:JSONDecode(response)
+    end)
+    
+    if not okDec or not data or not data.success then
+        return nil
+    end
+    
+    return data
+end
+
+function PepeLoader:formatExpiry(timestamp)
+    if not timestamp or timestamp <= 0 then
+        return "Never"
+    end
+    
+    local currentTime = os.time()
+    
+    if timestamp < currentTime then
+        return "Expired"
+    end
+    
+    local timeLeft = timestamp - currentTime
+    local days = math.floor(timeLeft / 86400)
+    
+    if days > 365 then
+        local years = math.floor(days / 365)
+        return years.." year"..(years ~= 1 and "s" or "")
+    elseif days > 30 then
+        local months = math.floor(days / 30)
+        return months.." month"..(months ~= 1 and "s" or "")
+    elseif days > 0 then
+        return days.." day"..(days ~= 1 and "s" or "")
+    else
+        local hours = math.floor(timeLeft / 3600)
+        return hours.." hour"..(hours ~= 1 and "s" or "")
+    end
+end
+
 function PepeLoader:authenticate(key)
     if not self.api then
         self:setStatus("Luarmor API error", Color3.fromRGB(240, 120, 120))
@@ -690,16 +740,35 @@ function PepeLoader:authenticate(key)
         self.authenticated = true
         self.keyData = status
         
-        local expiryText = "Never"
-        if status.expiry and status.expiry ~= "lifetime" and status.expiry ~= "never" then
-            expiryText = status.expiry
-        end
-        self.ui.ExpiryLabel.Text = "Expires: "..expiryText
+        local keyDetails = self:getKeyDetails(key)
         
-        if status.discord then
-            self.ui.DiscordActual.Text = "Discord: "..status.discord
+        if keyDetails then
+            if keyDetails.expires_at then
+                local expiryText = self:formatExpiry(keyDetails.expires_at)
+                self.ui.ExpiryLabel.Text = "Expires: "..expiryText
+            else
+                self.ui.ExpiryLabel.Text = "Expires: Never"
+            end
+            
+            if keyDetails.discord_id and keyDetails.discord_id ~= "" then
+                self.ui.DiscordActual.Text = "Discord: "..keyDetails.discord_id
+            elseif keyDetails.email and keyDetails.email ~= "" then
+                self.ui.DiscordActual.Text = "Email: "..keyDetails.email
+            else
+                self.ui.DiscordActual.Text = "Discord: N/A"
+            end
         else
-            self.ui.DiscordActual.Text = "Discord: N/A"
+            local expiryText = "Never"
+            if status.expiry and status.expiry ~= "lifetime" and status.expiry ~= "never" then
+                expiryText = status.expiry
+            end
+            self.ui.ExpiryLabel.Text = "Expires: "..expiryText
+            
+            if status.discord then
+                self.ui.DiscordActual.Text = "Discord: "..status.discord
+            else
+                self.ui.DiscordActual.Text = "Discord: N/A"
+            end
         end
         
         self:showAuthenticatedState()
