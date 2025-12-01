@@ -11,7 +11,7 @@ local MarketplaceService = game:GetService("MarketplaceService")
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
-local KEY_PATH = "Maske_Luarmor_Key.txt"
+local KEY_PATH = "Pepe_Luarmor_Key.txt"
 
 local function safeRead(path)
     if isfile then
